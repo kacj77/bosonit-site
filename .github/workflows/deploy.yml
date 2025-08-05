@@ -1,0 +1,31 @@
+name: Deploy to StackCP
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      STACK_USER: ${{ vars.STACK_USER }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - run: npm ci
+    - run: npm run build
+
+    - name: Install private key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.STACKCP_KEY }}" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        ssh-keyscan ssh.us.stackcp.com >> ~/.ssh/known_hosts
+
+    - name: Rsync to StackCP
+      run: |
+        rsync -avz --delete \
+          --chmod=Du=rwx,Dg=rx,Do=rx,Fu=rw,Fg=r,Fo=r \
+          dist/ "${STACK_USER}@ssh.us.stackcp.com:~/public_html/bosonit.org/"
